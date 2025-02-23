@@ -1,5 +1,5 @@
 import pymongo
-import datetime
+from datetime import datetime
 import bcrypt
 from bson import ObjectId
 
@@ -12,12 +12,13 @@ db = client.ToDoList
 class Task:
     @staticmethod
     def create_task(user_id, title, description, due_date, reminders=None):
+        deadline = datetime.fromisoformat(due_date)
         task = {
-            "user_id": user_id,
+            "user_id": ObjectId(user_id),
             "title": title,
             "description": description,
-            "deadline": due_date,
-            "created_at": datetime.datetime.now(),
+            "deadline": deadline,
+            "created_at": datetime.now(),
             "reminders": reminders or [],
             "completed": False
         }
@@ -25,28 +26,7 @@ class Task:
 
     @staticmethod
     def get_user_tasks(user_id):
-        return list(db.tasks.find({"user_id": user_id}))
-
-    @staticmethod
-    def update_task_status(task_id):
-        # Найти задачу и получить текущее значение completed
-        task = db.tasks.find_one({"_id": task_id})
-
-        if task:
-            # Изменить status на противоположное
-            new_status = not task["completed"]
-            db.tasks.update_one(
-                {"_id": task_id},
-                {"$set": {"completed": new_status}}
-            )
-            return db.tasks.find_one({"_id": task_id})  # Возвращает обновлённую задачу
-
-        return None  # Если задача не найдена
-
-    @staticmethod
-    def delete_task(task_id):
-        db.tasks.delete_one({"_id": task_id})
-
+        return list(db.tasks.find({"user_id": ObjectId(user_id)}))
 
     @staticmethod
     def get_task_by_id(task_id):
@@ -59,7 +39,7 @@ class Task:
             {"$set": {
                 "title": title,
                 "description": description,
-                "deadline": deadline,
+                "deadline": datetime.fromisoformat(deadline),
                 "reminders": reminders
             }}
         )
@@ -74,8 +54,6 @@ class Task:
     @staticmethod
     def delete_task(task_id):
         db.tasks.delete_one({"_id": ObjectId(task_id)})
-
-
 
 class User(UserMixin):
     def __init__(self, user_data):
@@ -102,7 +80,7 @@ class User(UserMixin):
                 "username": username,
                 "email": email,
                 "password": bcrypt.hashpw(password.encode('utf-8'), bcrypt.gensalt()),
-                "created_at": datetime.datetime.now()
+                "created_at": datetime.now()
             })
             return True
         except:

@@ -5,5 +5,63 @@ index
 {% endblock %}
 
 {% block body %}
-"Hello world!"
+<!-- Hero Section -->
+<section class="hero bg-gradient-primary text-white py-5">
+    <div class="container">
+        <div class="row align-items-center">
+            <div class="col-lg-6">
+                <h1 class="display-4 fw-bold mb-4">Your Perfect Task Manager</h1>
+                <p class="lead mb-4">Organize your work and life with our intuitive todo list app. Never miss a deadline again!</p>
+                <div class="d-flex gap-3">
+                    {% if current_user.is_authenticated %}
+                        <a href="{{ url_for('tasks.tasks') }}" class="btn btn-light btn-lg px-4">
+                            Go to Tasks <i class="bi bi-arrow-right"></i>
+                        </a>
+                    {% else %}
+                        <a href="{{ url_for('authorization.register') }}" class="btn btn-light btn-lg px-4">
+                            Get Started
+                        </a>
+                        <a href="{{ url_for('authorization.login') }}" class="btn btn-outline-light btn-lg px-4">
+                            Login
+                        </a>
+                    {% endif %}
+                </div>
+            </div>
+            <div class="col-lg-6 text-center mt-5 mt-lg-0">
+                <img src="https://cdn-icons-png.flaticon.com/512/1067/1067555.png"
+                     alt="Task Manager Illustration"
+                     class="img-fluid"
+                     style="max-height: 400px;">
+            </div>
+        </div>
+    </div>
+</section>
+
+
+
+<style>
+    .hero {
+        background: linear-gradient(135deg, #6366f1 0%, #a855f7 100%);
+    }
+
+    .icon-wrapper {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        transition: transform 0.3s ease;
+    }
+
+    .card:hover .icon-wrapper {
+        transform: translateY(-5px);
+    }
+
+    .btn {
+        transition: all 0.3s ease;
+    }
+
+    .btn:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 5px 15px rgba(0,0,0,0.1);
+    }
+</style>
 {% endblock %}

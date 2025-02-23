@@ -1,5 +1,5 @@
 from flask import Blueprint, render_template, request, redirect, url_for, session
-from flask_login import login_required, logout_user, login_user
+from flask_login import login_required, logout_user, login_user, current_user
 
 from ..models import User
 
@@ -7,6 +7,9 @@ authorization_bp = Blueprint("authorization", __name__)
 
 @authorization_bp.route('/login', methods=['GET', 'POST'])
 def login():
+    if current_user.is_authenticated:
+        return redirect(url_for("tasks.tasks"))
+
     if request.method == 'POST':
         username = request.form.get('username')
         password = request.form.get('password')
