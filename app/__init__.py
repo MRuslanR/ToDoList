@@ -7,7 +7,6 @@ app.config['SECRET_KEY'] = 'the random string'
 
 login_manager = LoginManager(app)
 
-
 from .routes.authorization import authorization_bp
 from .routes.tasks import tasks_bp
 from .routes.index import index_bp

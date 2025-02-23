@@ -2,11 +2,13 @@ import pymongo
 from datetime import datetime
 import bcrypt
 from bson import ObjectId
+import certifi
 
 from flask_login import UserMixin
 
+uri = "mongodb+srv://1ghawk1:HhEiOa8RVLkFhNtW@todolistclaster.rhrft.mongodb.net/?retryWrites=true&w=majority&appName=ToDoListClaster"
 
-client = pymongo.MongoClient("mongodb://localhost:27017")
+client = pymongo.MongoClient(uri, tlsCAFile=certifi.where())
 db = client.ToDoList
 
 class Task:
