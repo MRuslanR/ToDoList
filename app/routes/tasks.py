@@ -1,6 +1,5 @@
 from flask import Blueprint, render_template, request, redirect, url_for, jsonify
 from flask_login import login_required, current_user
-from bson import ObjectId
 from ..models import Task
 
 tasks_bp = Blueprint("tasks", __name__)
