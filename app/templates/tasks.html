@@ -294,7 +294,7 @@
         div.innerHTML = `
             <input type="datetime-local" class="form-control" name="reminders" value="${value}">
             <button type="button" class="btn btn-outline-danger" onclick="this.parentElement.remove()">
-                <i class="bi bi-trash"></i>
+                <i class="bi bi-trash">x</i>
             </button>
         `;
         container.appendChild(div);
@@ -307,7 +307,7 @@
         div.innerHTML = `
             <input type="datetime-local" class="form-control" name="reminders" value="${value}">
             <button type="button" class="btn btn-outline-danger" onclick="this.parentElement.remove()">
-                <i class="bi bi-trash"></i>
+                <i class="bi bi-trash">x</i>
             </button>
         `;
         container.appendChild(div);
@@ -320,9 +320,11 @@
         const formData = {
             title: document.getElementById('editTitle').value,
             description: document.getElementById('editDescription').value,
-            deadline: document.getElementById('editDeadline').value,
+            // Преобразуем дату дедлайна в ISO, чтобы учесть часовой пояс
+            deadline: new Date(document.getElementById('editDeadline').value).toISOString(),
+            // Аналогично для reminder-ов – преобразуем каждое значение в ISO
             reminders: Array.from(document.querySelectorAll('#editRemindersContainer input'))
-                        .map(input => input.value)
+                        .map(input => new Date(input.value).toISOString())
         };
 
         await fetch(`/task/${taskId}`, {
@@ -332,6 +334,7 @@
         });
         window.location.reload();
     });
+
 
     // Collapse Animation
     document.querySelectorAll('.collapse-btn').forEach(btn => {

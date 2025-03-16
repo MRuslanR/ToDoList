@@ -6,11 +6,14 @@ tasks_bp = Blueprint("tasks", __name__)
 
 
 def check_task_ownership(task_id):
-    task = Task.get_task_by_id(task_id)
-    if not task or str(task['user_id']) != current_user.id:
+    try:
+        task = Task.get_task_by_id(task_id)
+        if not task or str(task['user_id']) != current_user.id:
+            return None
+        return task
+    except Exception as e:
+        print(f"Ошибка проверки прав: {e}")
         return None
-    return task
-
 
 @tasks_bp.route('/tasks', methods=['GET', 'POST'])
 @login_required
@@ -36,7 +39,6 @@ def tasks():
 def update_task(task_id):
     if not check_task_ownership(task_id):
         return jsonify({'error': 'Access denied'}), 403
-
     data = request.json
     Task.update_task(
         task_id=task_id,
@@ -63,14 +65,19 @@ def get_task(task_id):
 @tasks_bp.route('/task/<task_id>/status', methods=['PUT'])
 @login_required
 def update_task_status(task_id):
-    if not check_task_ownership(task_id):
+    task = check_task_ownership(task_id)
+    if not task:
         return jsonify({'error': 'Access denied'}), 403
 
-    Task.update_task_status(
-        task_id=task_id,
-        completed=request.json.get('completed', False)
-    )
-    return jsonify({'status': 'success'})
+    try:
+        completed = request.json.get('completed', False)
+        Task.update_task_status(
+            task_id=task_id,
+            completed=completed
+        )
+        return jsonify({'status': 'success'})
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
 
 
 @tasks_bp.route('/task/<task_id>', methods=['DELETE'])

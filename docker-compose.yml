@@ -1,0 +1,35 @@
+version: '3.8'
+
+services:
+  web:
+    build: .
+    container_name: flask_app
+    ports:
+      - "5000:5000"
+    depends_on:
+      - redis
+    environment:
+      - FLASK_ENV=development
+      - PYTHONUNBUFFERED=1
+
+  worker:
+    build: .
+    container_name: celery_worker
+    command: celery -A app.celery_worker.celery worker --loglevel=info
+    depends_on:
+      - redis
+
+  bot:
+    build: .
+    container_name: telegram_bot
+    command: python bot.py  # Команда для запуска бота
+    depends_on:
+      - redis  # Если бот использует Redis
+    environment:
+      - FLASK_ENV=development  # Если требуются переменные Flask
+
+  redis:
+    image: redis:6-alpine
+    container_name: redis_server
+    ports:
+      - "6379:6379"
