@@ -55,23 +55,22 @@
 
     <!-- Active Tasks -->
     {% if active_tasks %}
-    <div class="card shadow-sm mb-3">
+    <div class="card shadow-sm mb-3" id="activeTasks">
         <div class="card-header bg-primary text-white d-flex justify-content-between align-items-center collapse-btn"
-             data-bs-toggle="collapse" data-bs-target="#activeTasks">
+             data-bs-toggle="collapse" data-bs-target="#activeTasksContainer">
             <span>
                 <i class="bi bi-list-task me-2"></i>
                 Active ({{ active_tasks|length }})
             </span>
             <i class="bi bi-chevron-down"></i>
         </div>
-        <div class="collapse show" id="activeTasks">
+        <div class="collapse show" id="activeTasksContainer">
             <div class="list-group list-group-flush">
                 {% for task in active_tasks %}
-                <div class="list-group-item task-item d-flex align-items-center
-                    {% if task.deadline < now %}overdue{% endif %}">
+                <div class="list-group-item task-item d-flex align-items-center {% if task.deadline < now %}overdue{% endif %}"
+                     data-deadline="{{ task.deadline }}">
                     <div class="form-check form-switch me-2">
-                        <input class="form-check-input" type="checkbox"
-                               data-task-id="{{ task._id }}">
+                        <input class="form-check-input" type="checkbox" data-task-id="{{ task._id }}">
                     </div>
                     <div class="task-content">
                         <div class="task-title">{{ task.title }}</div>
@@ -84,8 +83,7 @@
                             {% if task.deadline < now %}(Overdue){% endif %}
                         </small>
                     </div>
-                    <button class="btn btn-danger delete-btn btn-sm ms-2"
-                            data-task-id="{{ task._id }}">
+                    <button class="btn btn-danger delete-btn btn-sm ms-2" data-task-id="{{ task._id }}">
                         Delete
                     </button>
                 </div>
@@ -95,24 +93,40 @@
     </div>
     {% endif %}
 
+    <!-- Overdue Tasks -->
+    <div class="card shadow-sm mb-3" id="overdueTasks" style="display:none;">
+        <div class="card-header bg-danger text-white d-flex justify-content-between align-items-center collapse-btn"
+             data-bs-toggle="collapse" data-bs-target="#overdueTasksContainer">
+            <span id="overdueHeaderCount">
+                <i class="bi bi-exclamation-triangle me-2"></i>
+                Overdue (0)
+            </span>
+            <i class="bi bi-chevron-down"></i>
+        </div>
+        <div class="collapse show" id="overdueTasksContainer">
+            <div class="list-group list-group-flush">
+                <!-- Просроченные задачи будут перенесены сюда через JS -->
+            </div>
+        </div>
+    </div>
+
     <!-- Completed Tasks -->
     {% if completed_tasks %}
-    <div class="card shadow-sm mb-3">
+    <div class="card shadow-sm mb-3" id="completedTasks">
         <div class="card-header bg-secondary text-white d-flex justify-content-between align-items-center collapse-btn"
-             data-bs-toggle="collapse" data-bs-target="#completedTasks">
+             data-bs-toggle="collapse" data-bs-target="#completedTasksContainer">
             <span>
                 <i class="bi bi-check2-all me-2"></i>
                 Completed ({{ completed_tasks|length }})
             </span>
             <i class="bi bi-chevron-down"></i>
         </div>
-        <div class="collapse show" id="completedTasks">
+        <div class="collapse show" id="completedTasksContainer">
             <div class="list-group list-group-flush">
                 {% for task in completed_tasks %}
                 <div class="list-group-item task-item d-flex align-items-center">
                     <div class="form-check form-switch me-2">
-                        <input class="form-check-input" type="checkbox" checked
-                               data-task-id="{{ task._id }}">
+                        <input class="form-check-input" type="checkbox" checked data-task-id="{{ task._id }}">
                     </div>
                     <div class="task-content text-muted">
                         <div class="task-title text-decoration-line-through">{{ task.title }}</div>
@@ -124,8 +138,7 @@
                             {{ task.deadline|datetime_format }}
                         </small>
                     </div>
-                    <button class="btn btn-danger delete-btn btn-sm ms-2"
-                            data-task-id="{{ task._id }}">
+                    <button class="btn btn-danger delete-btn btn-sm ms-2" data-task-id="{{ task._id }}">
                         Delete
                     </button>
                 </div>
@@ -266,7 +279,6 @@
             if (e.target.tagName === 'BUTTON' || e.target.closest('button')) return;
 
             const taskId = this.closest('.task-item').querySelector('[data-task-id]').dataset.taskId;
-
             const response = await fetch(`/task/${taskId}`);
             const task = await response.json();
 
@@ -335,7 +347,6 @@
         window.location.reload();
     });
 
-
     // Collapse Animation
     document.querySelectorAll('.collapse-btn').forEach(btn => {
         btn.addEventListener('click', function() {
@@ -343,6 +354,37 @@
             icon.classList.toggle('bi-chevron-down');
             icon.classList.toggle('bi-chevron-up');
         });
+    });
+
+    // Перемещение просроченных задач из блока Active в блок Overdue
+    document.addEventListener("DOMContentLoaded", function() {
+        const now = new Date();
+        const activeTaskItems = document.querySelectorAll('#activeTasksContainer .task-item');
+        const overdueContainer = document.querySelector('#overdueTasksContainer .list-group') || document.querySelector('#overdueTasksContainer');
+        let overdueCount = 0;
+
+        activeTaskItems.forEach(taskEl => {
+            const deadlineStr = taskEl.getAttribute('data-deadline');
+            if (deadlineStr) {
+                const deadline = new Date(deadlineStr);
+                if (deadline < now) {
+                    overdueContainer.appendChild(taskEl);
+                    overdueCount++;
+                }
+            }
+        });
+
+        // Обновление счётчиков в заголовках
+        const activeHeaderSpan = document.querySelector('#activeTasks .card-header span');
+        const remainingActiveCount = document.querySelectorAll('#activeTasksContainer .task-item').length;
+        activeHeaderSpan.innerHTML = `<i class="bi bi-list-task me-2"></i> Active (${remainingActiveCount})`;
+
+        const overdueHeaderSpan = document.getElementById('overdueHeaderCount');
+        overdueHeaderSpan.innerHTML = `<i class="bi bi-exclamation-triangle me-2"></i> Overdue (${overdueCount})`;
+
+        // Если просроченных задач больше 0, отображаем карточку, иначе скрываем её
+        const overdueCard = document.getElementById('overdueTasks');
+        overdueCard.style.display = overdueCount > 0 ? 'block' : 'none';
     });
 </script>
 {% endblock %}

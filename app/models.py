@@ -76,8 +76,14 @@ class Task:
             )
 
     @staticmethod
-    def update_task(task_id, title, description, deadline_str, reminders):
-        # Сначала получим старую задачу
+    def update_task(task_id, title, description, deadline, reminders):
+        # Вспомогательная функция для корректного парсинга ISO-строки с 'Z'
+        def parse_iso_datetime(dt_str):
+            if dt_str.endswith('Z'):
+                dt_str = dt_str.replace('Z', '+00:00')
+            return datetime.fromisoformat(dt_str)
+
+        # Получаем старую задачу
         old_task = Task.get_task_by_id(task_id)
         # Отменяем ранее запланированные задачи, если они есть
         if old_task.get("deadline_task_id"):
@@ -85,14 +91,14 @@ class Task:
         for rem_id in old_task.get("reminder_task_ids", []):
             revoke_task(rem_id)
 
-        # Сохраняем введённое время без преобразования
-        deadline = datetime.fromisoformat(deadline_str)
-        reminders_dt = [datetime.fromisoformat(r) for r in reminders] if reminders else []
+        # Преобразуем введённый deadline и reminder-ы в datetime с учетом 'Z'
+        new_deadline = parse_iso_datetime(deadline)
+        reminders_dt = [parse_iso_datetime(r) for r in reminders] if reminders else []
 
         update_data = {
             "title": title,
             "description": description,
-            "deadline": deadline,
+            "deadline": new_deadline,
             "reminders": reminders_dt,
             # Сбрасываем id запланированных задач
             "deadline_task_id": None,
@@ -103,7 +109,7 @@ class Task:
         # Планируем новые задачи, используя UTC-конвертацию
         task = Task.get_task_by_id(task_id)
         if not task["completed"]:
-            utc_deadline = convert_to_utc(deadline_str)
+            utc_deadline = convert_to_utc(deadline)
             if utc_deadline > datetime.now(pytz.utc):
                 deadline_task = schedule_deadline_reminder.apply_async(
                     eta=utc_deadline,
