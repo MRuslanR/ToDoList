@@ -17,3 +17,4 @@ redis==4.6.0
 telebot
 requests>=2.31.0
 pytz
+dotenv

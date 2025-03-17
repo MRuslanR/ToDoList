@@ -6,24 +6,30 @@ import requests
 import threading
 from datetime import datetime
 import pytz
-from tokens import TOKEN
 
-token = TOKEN # ВВЕСТИ ТОКЕН
+import os
+from dotenv import load_dotenv
+load_dotenv()
+
+TOKEN = os.getenv('TOKEN')
+
 bot = telebot.TeleBot(TOKEN)
 r = redis.Redis(host='redis', port=6379, db=0)
 
 def get_auth_inline_keyboard(chat_id):
-    auth_url = f"http://127.0.0.1:5000/auto_auth?chat_id={chat_id}"
+    auth_url = f"http://127.0.0.1:5001/auto_auth?chat_id={chat_id}"
     markup = types.InlineKeyboardMarkup()
-    button = types.InlineKeyboardButton(text="Авторизация", url=auth_url)
+    button = types.InlineKeyboardButton(text="Вход", url=auth_url)
     markup.add(button)
     return markup
 
 def get_main_panel_keyboard():
     markup = types.ReplyKeyboardMarkup(resize_keyboard=True)
-    button_login = types.KeyboardButton("Авторизация")
+    button_login = types.KeyboardButton("Вход")
     button_list = types.KeyboardButton("Список дел")
+    button_today = types.KeyboardButton("Список задач на сегодня")
     markup.row(button_login, button_list)
+    markup.row(button_today)
     return markup
 
 def redis_listener():
@@ -44,9 +50,6 @@ def format_time_diff(deadline_str, target_tz='Europe/Moscow'):
     Преобразует строку с датой (ISO-формат) в сообщение с разницей времени.
     Если дедлайн ещё не наступил, возвращает "осталось HH ч MM м SS с",
     иначе – "просрочено на HH ч MM м SS с".
-
-    Мы вычисляем абсолютное число часов, минут и секунд, чтобы избежать
-    негативного представления timedelta (например, "-1 day, 21:00:00").
     """
     try:
         deadline = datetime.fromisoformat(deadline_str)
@@ -71,7 +74,6 @@ def format_time_diff(deadline_str, target_tz='Europe/Moscow'):
     else:
         return f"просрочено на {time_str}"
 
-
 @bot.message_handler(commands=['start'])
 def send_welcome(message):
     chat_id = str(message.chat.id)
@@ -92,7 +94,7 @@ def send_welcome(message):
         # Отправляем сообщение с кнопкой авторизации
         auth_markup = get_auth_inline_keyboard(chat_id)
         bot.send_message(message.chat.id, welcome_text, reply_markup=auth_markup)
-        # Отправляем панель с кнопками "войти" и "список дел"
+        # Отправляем панель с кнопками "Вход", "Список дел" и "Список задач на сегодня"
         panel_markup = get_main_panel_keyboard()
         bot.send_message(message.chat.id, "Выберите действие:", reply_markup=panel_markup)
 
@@ -100,7 +102,7 @@ def send_welcome(message):
         print(f"Ошибка: {e}")
         bot.reply_to(message, "Сервис недоступен. Попробуйте позже.")
 
-@bot.message_handler(func=lambda message: message.text.lower() == "авторизация")
+@bot.message_handler(func=lambda message: message.text.lower() == "вход")
 def handle_login(message):
     chat_id = str(message.chat.id)
     auth_markup = get_auth_inline_keyboard(chat_id)
@@ -123,7 +125,7 @@ def handle_list_tasks(message):
                     title = task.get('title', 'Без названия')
                     deadline_str = task.get('deadline', '')
                     time_status = format_time_diff(deadline_str) if deadline_str else ""
-                    if not(task.get('completed')):
+                    if not task.get('completed'):
                         message_text += f"{title}: {time_status}\n"
             else:
                 message_text = "Список дел пуст."
@@ -134,6 +136,47 @@ def handle_list_tasks(message):
             bot.send_message(message.chat.id, "Не удалось получить список дел. Попробуйте позже.")
     except Exception as e:
         print(f"Ошибка получения списка дел: {e}")
+        bot.send_message(message.chat.id, "Сервис недоступен. Попробуйте позже.")
+
+@bot.message_handler(func=lambda message: message.text.lower() == "список задач на сегодня")
+def handle_today_tasks(message):
+    chat_id = str(message.chat.id)
+    try:
+        response = requests.get(
+            'http://web:5000/api/tasks',
+            params={'chat_id': chat_id},
+            timeout=5
+        )
+        if response.status_code == 200:
+            tasks = response.json()
+            local_tz = pytz.timezone('Europe/Moscow')
+            today_date = datetime.now(local_tz).date()
+            message_text = "Ваш список задач на сегодня:\n"
+            found = False
+            for task in tasks:
+                deadline_str = task.get('deadline', '')
+                if deadline_str:
+                    try:
+                        deadline = datetime.fromisoformat(deadline_str)
+                    except Exception as e:
+                        continue
+                    # Если deadline не имеет tzinfo, локализуем его
+                    if deadline.tzinfo is None:
+                        deadline = local_tz.localize(deadline)
+                    else:
+                        deadline = deadline.astimezone(local_tz)
+                    if deadline.date() == today_date and not task.get('completed', False):
+                        title = task.get('title', 'Без названия')
+                        time_status = format_time_diff(deadline_str)
+                        message_text += f"{title}: {time_status}\n"
+                        found = True
+            if not found:
+                message_text = "У вас нет задач на сегодня."
+            bot.send_message(message.chat.id, message_text)
+        else:
+            bot.send_message(message.chat.id, "Не удалось получить список задач. Попробуйте позже.")
+    except Exception as e:
+        print(f"Ошибка получения списка задач: {e}")
         bot.send_message(message.chat.id, "Сервис недоступен. Попробуйте позже.")
 
 if __name__ == '__main__':

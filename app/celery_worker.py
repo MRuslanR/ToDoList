@@ -40,7 +40,7 @@ def schedule_deadline_reminder(chat_id, task_id, task_title):
     from app.models import Task  # Импорт здесь для избежания циклических импортов
     task = Task.get_task_by_id(task_id)
     if task and not task.get("completed"):
-        send_to_bot(chat_id, f"Дедлайн задачи {task_title} подошел к концу 💀. Задача будет продлена на 1 день, после чего - вычеркнута.")
+        send_to_bot(chat_id, f"Дедлайн задачи '{task_title}' подошел к концу.")
         print(f"Напоминание для дедлайна задачи {task_id} отправлено")
         # Планируем finalize_task через 1 минуту (для отладки, вместо 1 дня)
         finalize_eta = datetime.utcnow() + timedelta(days=1)

@@ -6,10 +6,15 @@ from app.celery_worker import celery, schedule_deadline_reminder, schedule_singl
 import certifi
 import pytz  # для работы с часовыми поясами
 from flask import Blueprint, request, jsonify, redirect, url_for
+from datetime import timedelta
 
 from flask_login import UserMixin
 
-uri = "mongodb+srv://1ghawk1:HhEiOa8RVLkFhNtW@todolistclaster.rhrft.mongodb.net/?retryWrites=true&w=majority&appName=ToDoListClaster"
+import os
+from dotenv import load_dotenv
+load_dotenv()
+uri = os.getenv('DATABASE_URI')
+
 client = pymongo.MongoClient(uri, tlsCAFile=certifi.where())
 db = client.ToDoList
 
@@ -75,13 +80,16 @@ class Task:
                 {"$set": {"reminder_task_ids": reminder_task_ids}}
             )
 
+
     @staticmethod
     def update_task(task_id, title, description, deadline, reminders):
-        # Вспомогательная функция для корректного парсинга ISO-строки с 'Z'
-        def parse_iso_datetime(dt_str):
+        # Вспомогательная функция:
+        # Если строка заканчивается на 'Z', заменяем её на '+00:00' для корректного парсинга,
+        # затем прибавляем 3 часа к полученному времени.
+        def parse_iso_and_add3(dt_str):
             if dt_str.endswith('Z'):
                 dt_str = dt_str.replace('Z', '+00:00')
-            return datetime.fromisoformat(dt_str)
+            return datetime.fromisoformat(dt_str) + timedelta(hours=3)
 
         # Получаем старую задачу
         old_task = Task.get_task_by_id(task_id)
@@ -91,25 +99,24 @@ class Task:
         for rem_id in old_task.get("reminder_task_ids", []):
             revoke_task(rem_id)
 
-        # Преобразуем введённый deadline и reminder-ы в datetime с учетом 'Z'
-        new_deadline = parse_iso_datetime(deadline)
-        reminders_dt = [parse_iso_datetime(r) for r in reminders] if reminders else []
+        # Парсим дату дедлайна и напоминания с прибавлением 3 часов
+        new_deadline = parse_iso_and_add3(deadline)
+        reminders_dt = [parse_iso_and_add3(r) for r in reminders] if reminders else []
 
         update_data = {
             "title": title,
             "description": description,
-            "deadline": new_deadline,
+            "deadline": new_deadline,  # сохраняем время с прибавленными 3 часами
             "reminders": reminders_dt,
-            # Сбрасываем id запланированных задач
             "deadline_task_id": None,
             "reminder_task_ids": []
         }
         db.tasks.update_one({"_id": ObjectId(task_id)}, {"$set": update_data})
 
-        # Планируем новые задачи, используя UTC-конвертацию
+        # Планируем новые задачи, переводя обновлённое время (с поправкой) в UTC
         task = Task.get_task_by_id(task_id)
         if not task["completed"]:
-            utc_deadline = convert_to_utc(deadline)
+            utc_deadline = convert_to_utc(new_deadline.isoformat())
             if utc_deadline > datetime.now(pytz.utc):
                 deadline_task = schedule_deadline_reminder.apply_async(
                     eta=utc_deadline,
@@ -120,8 +127,8 @@ class Task:
                     {"$set": {"deadline_task_id": deadline_task.id}}
                 )
             reminder_task_ids = []
-            for r in reminders or []:
-                utc_reminder = convert_to_utc(r)
+            for r in reminders_dt:
+                utc_reminder = convert_to_utc(r.isoformat())
                 if utc_reminder > datetime.now(pytz.utc):
                     reminder_task = schedule_single_reminder.apply_async(
                         eta=utc_reminder,
