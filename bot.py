@@ -17,7 +17,7 @@ bot = telebot.TeleBot(TOKEN)
 r = redis.Redis(host='redis', port=6379, db=0)
 
 def get_auth_inline_keyboard(chat_id):
-    auth_url = f"https://mruslanr-todolist-fabd.twc1.net/auto_auth?chat_id={chat_id}"
+    auth_url = f"https://mruslanr-todolist-34e5.twc1.net/auto_auth?chat_id={chat_id}"
     markup = types.InlineKeyboardMarkup()
     button = types.InlineKeyboardButton(text="Вход", url=auth_url)
     markup.add(button)
