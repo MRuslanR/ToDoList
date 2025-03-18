@@ -21,15 +21,12 @@ db = client.ToDoList
 tasks_bp = Blueprint("tasks", __name__)
 
 def convert_to_utc(time_str, tz_str='Europe/Moscow'):
-    """
-    Принимает строку с датой и временем (без информации о часовом поясе),
-    локализует её по часовому поясу tz_str и конвертирует в UTC.
-    """
-    local_tz = pytz.timezone(tz_str)
-    naive_dt = datetime.fromisoformat(time_str)
-    local_dt = local_tz.localize(naive_dt, is_dst=None)
-    utc_dt = local_dt.astimezone(pytz.utc)
-    return utc_dt
+    dt = datetime.fromisoformat(time_str)
+    if dt.tzinfo is None:
+        local_tz = pytz.timezone(tz_str)
+        dt = local_tz.localize(dt, is_dst=None)
+    return dt.astimezone(pytz.utc)
+
 
 class Task:
     @staticmethod
@@ -116,7 +113,7 @@ class Task:
         # Планируем новые задачи, переводя обновлённое время (с поправкой) в UTC
         task = Task.get_task_by_id(task_id)
         if not task["completed"]:
-            utc_deadline = convert_to_utc(new_deadline.isoformat())
+            utc_deadline = convert_to_utc(new_deadline.replace(tzinfo=None).isoformat())
             if utc_deadline > datetime.now(pytz.utc):
                 deadline_task = schedule_deadline_reminder.apply_async(
                     eta=utc_deadline,
@@ -128,7 +125,7 @@ class Task:
                 )
             reminder_task_ids = []
             for r in reminders_dt:
-                utc_reminder = convert_to_utc(r.isoformat())
+                utc_reminder = convert_to_utc(r.replace(tzinfo=None).isoformat())
                 if utc_reminder > datetime.now(pytz.utc):
                     reminder_task = schedule_single_reminder.apply_async(
                         eta=utc_reminder,
